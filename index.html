@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apresentação Automática de PDF</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000;
+        }
+        #pdf-container {
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #pdf-viewer {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        #controls {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 5px;
+            color: white;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            display: none;
+        }
+        #controls:hover {
+            display: block;
+        }
+        #progress-container {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+        #progress-bar {
+            height: 100%;
+            width: 0%;
+            background-color: #fff;
+            transition: width linear;
+        }
+    </style>
+</head>
+<body>
+    <div id="pdf-container">
+        <!-- Substitua "apresentacao.pdf" pelo nome do seu arquivo PDF -->
+        <iframe id="pdf-viewer" src="apresentacao.pdf#view=FitH&toolbar=0&navpanes=0&scrollbar=0"></iframe>
+    </div>
+    
+    <div id="controls">
+        <span id="page-info">Página 1 de X</span> | 
+        <button id="pause-btn">Pausar</button>
+    </div>
+    
+    <div id="progress-container">
+        <div id="progress-bar"></div>
+    </div>
+
+    <script>
+        // Configurações
+        const slideDuration = 20000; // 20 segundos por página
+        let currentPage = 1;
+        let totalPages = 0;
+        let isPaused = false;
+        let timer;
+        
+        // Elementos
+        const pdfViewer = document.getElementById('pdf-viewer');
+        const progressBar = document.getElementById('progress-bar');
+        const pageInfo = document.getElementById('page-info');
+        const pauseBtn = document.getElementById('pause-btn');
+        const controls = document.getElementById('controls');
+        
+        // Inicia a apresentação
+        function startPresentation() {
+            // Configura o visualizador de PDF
+            pdfViewer.addEventListener('load', function() {
+                // Isso só funciona se o PDF estiver hospedado no mesmo domínio
+                try {
+                    totalPages = pdfViewer.contentWindow.PDFViewerApplication.pagesCount;
+                    updatePageInfo();
+                } catch (e) {
+                    // Fallback para quando não conseguimos acessar a API do PDF viewer
+                    console.log("Não foi possível acessar a API do visualizador PDF");
+                    // Estima 10 páginas (você deve ajustar manualmente)
+                    totalPages = 10;
+                    updatePageInfo();
+                }
+                
+                startTimer();
+            });
+            
+            // Mostra controles ao mover o mouse
+            document.addEventListener('mousemove', function() {
+                controls.style.display = 'block';
+                setTimeout(() => {
+                    if (!isPaused) {
+                        controls.style.display = 'none';
+                    }
+                }, 2000);
+            });
+            
+            // Botão de pausa
+            pauseBtn.addEventListener('click', togglePause);
+            
+            // Entra em tela cheia automaticamente
+            enterFullscreen();
+        }
+        
+        // Atualiza a informação da página
+        function updatePageInfo() {
+            pageInfo.textContent = `Página ${currentPage} de ${totalPages}`;
+        }
+        
+        // Inicia o timer para troca de páginas
+        function startTimer() {
+            progressBar.style.transition = `width ${slideDuration/1000}s linear`;
+            progressBar.style.width = '100%';
+            
+            timer = setTimeout(() => {
+                if (!isPaused) {
+                    nextPage();
+                }
+            }, slideDuration);
+        }
+        
+        // Avança para a próxima página
+        function nextPage() {
+            currentPage++;
+            
+            if (currentPage > totalPages) {
+                currentPage = 1; // Volta para a primeira página
+            }
+            
+            // Tenta usar a API do visualizador PDF
+            try {
+                pdfViewer.contentWindow.PDFViewerApplication.page = currentPage;
+            } catch (e) {
+                // Fallback para URL hash
+                pdfViewer.src = `apresentacao.pdf#page=${currentPage}&view=FitH&toolbar=0&navpanes=0&scrollbar=0`;
+            }
+            
+            updatePageInfo();
+            resetProgressBar();
+            startTimer();
+        }
+        
+        // Reseta a barra de progresso
+        function resetProgressBar() {
+            progressBar.style.transition = 'none';
+            progressBar.style.width = '0';
+            setTimeout(() => {
+                progressBar.style.transition = `width ${slideDuration/1000}s linear`;
+                progressBar.style.width = '100%';
+            }, 10);
+        }
+        
+        // Pausa/continua a apresentação
+        function togglePause() {
+            isPaused = !isPaused;
+            
+            if (isPaused) {
+                clearTimeout(timer);
+                progressBar.style.transition = 'none';
+                pauseBtn.textContent = 'Continuar';
+            } else {
+                resetProgressBar();
+                startTimer();
+                pauseBtn.textContent = 'Pausar';
+                controls.style.display = 'none';
+            }
+        }
+        
+        // Entra em modo tela cheia
+        function enterFullscreen() {
+            const elem = document.documentElement;
+            
+            if (!document.fullscreenElement) {
+                if (elem.requestFullscreen) {
+                    elem.requestFullscreen();
+                } else if (elem.webkitRequestFullscreen) { /* Safari */
+                    elem.webkitRequestFullscreen();
+                } else if (elem.msRequestFullscreen) { /* IE11 */
+                    elem.msRequestFullscreen();
+                }
+            }
+        }
+        
+        // Inicia a apresentação quando o DOM estiver carregado
+        document.addEventListener('DOMContentLoaded', startPresentation);
+    </script>
+</body>
+</html>
